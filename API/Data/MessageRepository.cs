@@ -72,27 +72,28 @@ namespace API.Data
         {   // get all message by sent time desc
             var query = _context.Messages
                 .OrderByDescending(m => m.MessageSent)
+                .ProjectTo<MessageDto>(_mapper.ConfigurationProvider)
                 .AsQueryable();
 
             // container-switch: which message in container determine which msg we return 
             query = messageParams.Container switch
             {   // inbox is if we are the recipient of msg and we have read it
-                "Inbox" => query.Where(u => u.Recipient.UserName == messageParams.Username && u.RecipientDeleted == false),  // all msg reciver = para.usr
-                "Outbox" => query.Where(u => u.Sender.UserName == messageParams.Username && u.SenderDeleted == false),  // all msg sender = para.usr
-                _ => query.Where(u => u.Recipient.UserName ==
+                "Inbox" => query.Where(u => u.RecipientUsername == messageParams.Username 
+                    && u.RecipientDeleted == false),  // all msg reciver = para.usr
+                "Outbox" => query.Where(u => u.SenderUsername == messageParams.Username 
+                    && u.SenderDeleted == false),  // all msg sender = para.usr
+                _ => query.Where(u => u.RecipientUsername ==
                     messageParams.Username && u.RecipientDeleted == false && u.DateRead == null)  // all msg reciver = para.user && msg_unread
             };
-            var messages = query.ProjectTo<MessageDto>(_mapper.ConfigurationProvider);  // query result tran to Dto
-            return await PagedList<MessageDto>.CreateAsync(messages, messageParams.PageNumber, messageParams.PageSize);
+            // var messages = query.ProjectTo<MessageDto>(_mapper.ConfigurationProvider);  // query result tran to Dto
+            return await PagedList<MessageDto>.CreateAsync(query, messageParams.PageNumber, messageParams.PageSize);
         }
 
         public async Task<IEnumerable<MessageDto>> GetMessageThread(string currentUsername, string recipientUserName)
         {
-            // get msg not read and we mark them to read in here
-            // get msg in memory,then do sth for these msg, then tran to dto
             var messages = await _context.Messages
-                .Include(u => u.Sender).ThenInclude(p=>p.Photos)
-                .Include(u => u.Recipient).ThenInclude(p=>p.Photos)
+                // .Include(u => u.Sender).ThenInclude(p=>p.Photos)
+                // .Include(u => u.Recipient).ThenInclude(p=>p.Photos)
                 // when find msg bewteen curr-usr and sec-usr, pick out
                 .Where(m => m.Recipient.UserName == currentUsername && m.RecipientDeleted == false // |and& mix calcu & first then |
                         && m.Sender.UserName == recipientUserName
@@ -101,10 +102,11 @@ namespace API.Data
                         && m.Sender.UserName == currentUsername && m.SenderDeleted == false 
                 )
                 .OrderBy(m => m.MessageSent)
+                .ProjectTo<MessageDto>(_mapper.ConfigurationProvider)
                 .ToListAsync();
             
             var unreadMessages = messages.Where(m => m.DateRead == null
-                && m.Recipient.UserName == currentUsername).ToList(); 
+                && m.RecipientUsername == currentUsername).ToList(); 
             
             if (unreadMessages.Any())
             {
@@ -113,10 +115,10 @@ namespace API.Data
                     message.DateRead = DateTime.Now;
                 }
 
-                await _context.SaveChangesAsync();
+                // await _context.SaveChangesAsync();
             }
             
-            return _mapper.Map<IEnumerable<MessageDto>>(messages);  // return msg-dtos
+            return  messages; //_mapper.Map<IEnumerable<MessageDto>>(messages);  // return msg-dtos
         }
 
         public void RemoveConnection(Connection connection)
@@ -124,9 +126,9 @@ namespace API.Data
             _context.Connections.Remove(connection);
         }
 
-        public async Task<bool> SaveAllAsync()
-        {
-            return await _context.SaveChangesAsync() > 0;
-        }
+        // public async Task<bool> SaveAllAsync()
+        // {
+        //     return await _context.SaveChangesAsync() > 0;
+        // }
     }
 }

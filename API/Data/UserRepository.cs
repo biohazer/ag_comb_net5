@@ -68,10 +68,11 @@ namespace API.Data
             return await _contxt.Users.Include(p => p.Photos).SingleOrDefaultAsync(x => x.UserName == username);
         }
 
-        public async Task<bool> SaveAllAsync()
+        public async Task<string> GetUserGender(string username)
         {
-            return await _contxt.SaveChangesAsync() > 0;
-            // SaveChangesAsync methdo return a int, means how many changes accure
+            return await _contxt.Users
+                .Where(x => x.UserName == username)
+                .Select(x => x.Gender).FirstOrDefaultAsync();
         }
 
         public void Update(AppUser user)
